@@ -1,0 +1,107 @@
+name: Build And Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. v1.0.0"
+        required: true
+        default: "v1.0.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            artifact_name: knx-web-tool-macos
+            bundle_name: knx-web-tool-macos.zip
+          - os: windows-latest
+            artifact_name: knx-web-tool-windows
+            bundle_name: knx-web-tool-windows.zip
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller
+
+      - name: Build executable
+        env:
+          PYINSTALLER_CONFIG_DIR: ${{ github.workspace }}/.pyinstaller
+        run: pyinstaller --clean --noconfirm --onefile --name knx-web-tool knx_web_tool.py
+
+      - name: Package artifact (macOS)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir package
+          cp dist/knx-web-tool package/
+          cp README_web_tool.md package/README_web_tool.md
+          cd package
+          zip -r ../${{ matrix.bundle_name }} .
+
+      - name: Package artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path package | Out-Null
+          Copy-Item dist/knx-web-tool.exe package/
+          Copy-Item README_web_tool.md package/README_web_tool.md
+          Compress-Archive -Path package\* -DestinationPath "${{ matrix.bundle_name }}" -Force
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.bundle_name }}
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Prepare release files
+        run: |
+          mkdir -p out
+          find release-assets -type f -name "*.zip" -exec cp {} out/ \;
+          ls -l out
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.value }}
+          name: ${{ steps.tag.outputs.value }}
+          files: out/*.zip
+          generate_release_notes: true

@@ -1,0 +1,21 @@
+# Virtual env
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Build outputs
+build/
+dist/
+.pyinstaller/
+package/
+*.spec
+*.zip
+
+# Local generated outputs
+*_converted.xml
+*_converted.xlsx
+
+# macOS
+.DS_Store
