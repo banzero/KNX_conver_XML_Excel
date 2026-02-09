@@ -53,7 +53,8 @@ jobs:
         run: |
           mkdir package
           cp dist/knx-web-tool package/
-          cp README_web_tool.md package/README_web_tool.md
+          cp README.md package/README.md
+          cp README.en.md package/README.en.md
           cd package
           zip -r ../${{ matrix.bundle_name }} .
 
@@ -63,7 +64,8 @@ jobs:
         run: |
           New-Item -ItemType Directory -Path package | Out-Null
           Copy-Item dist/knx-web-tool.exe package/
-          Copy-Item README_web_tool.md package/README_web_tool.md
+          Copy-Item README.md package/README.md
+          Copy-Item README.en.md package/README.en.md
           Compress-Archive -Path package\* -DestinationPath "${{ matrix.bundle_name }}" -Force
 
       - name: Upload build artifact

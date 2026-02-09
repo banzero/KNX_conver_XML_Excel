@@ -16,7 +16,9 @@ import io
 import json
 import math
 import re
+import threading
 import uuid
+import webbrowser
 from dataclasses import dataclass, asdict
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -29,6 +31,9 @@ import xml.sax.saxutils as saxutils
 NS_URI = "http://knx.org/xml/ga-export/01"
 NS = {"k": NS_URI}
 ET.register_namespace("", NS_URI)
+
+PROJECT_NAME_ZH = "KNX 群组地址转换工作台"
+PROJECT_NAME_EN = "KNX Group Address Studio"
 
 DEVICE_NO = 9
 FUNCTIONS_BY_MIDDLE: Dict[int, Tuple[str, int]] = {
@@ -362,8 +367,8 @@ def build_xlsx(entries: List[Entry], names_by_address: Dict[str, str]) -> bytes:
         'xmlns:dcterms="http://purl.org/dc/terms/" '
         'xmlns:dcmitype="http://purl.org/dc/dcmitype/" '
         'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
-        "<dc:creator>KNX Web Tool</dc:creator>"
-        "<cp:lastModifiedBy>KNX Web Tool</cp:lastModifiedBy>"
+        f"<dc:creator>{PROJECT_NAME_EN}</dc:creator>"
+        f"<cp:lastModifiedBy>{PROJECT_NAME_EN}</cp:lastModifiedBy>"
         "</cp:coreProperties>"
     )
 
@@ -371,7 +376,7 @@ def build_xlsx(entries: List[Entry], names_by_address: Dict[str, str]) -> bytes:
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" '
         'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">'
-        "<Application>KNX Web Tool</Application>"
+        f"<Application>{PROJECT_NAME_EN}</Application>"
         "</Properties>"
     )
 
@@ -566,7 +571,7 @@ INDEX_HTML = r"""<!doctype html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>KNX 设备9 名称转换工具</title>
+  <title>KNX 群组地址转换工作台</title>
   <style>
     :root {
       --bg: #f3f5f4;
@@ -693,7 +698,7 @@ INDEX_HTML = r"""<!doctype html>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>KNX DALI 双色温调光灯（设备9）转换工具</h1>
+      <h1>KNX 群组地址转换工作台</h1>
       <div class="muted">上传 ETS XML -> 自动编号 -> 网页修改 -> 导出 XML 和 Excel</div>
     </div>
 
@@ -1085,9 +1090,32 @@ INDEX_HTML = r"""<!doctype html>
 """
 
 
-def run_server(host: str, port: int) -> None:
+def launch_url(host: str, port: int) -> str:
+    target_host = host
+    if host in {"0.0.0.0", "::", ""}:
+        target_host = "127.0.0.1"
+    return f"http://{target_host}:{port}"
+
+
+def open_browser_async(url: str, delay: float = 0.8) -> None:
+    def _open() -> None:
+        try:
+            webbrowser.open(url, new=2)
+        except Exception as exc:  # noqa: BLE001
+            print(f"Auto-open browser failed: {exc}")
+
+    timer = threading.Timer(delay, _open)
+    timer.daemon = True
+    timer.start()
+
+
+def run_server(host: str, port: int, auto_open_browser: bool = True) -> None:
+    url = launch_url(host, port)
     server = ThreadingHTTPServer((host, port), Handler)
-    print(f"KNX Web tool running at: http://{host}:{port}")
+    print(f"{PROJECT_NAME_EN} running at: {url}")
+    if auto_open_browser:
+        print(f"Opening browser: {url}")
+        open_browser_async(url)
     print("Press Ctrl+C to stop")
     server.serve_forever()
 
@@ -1096,9 +1124,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="KNX XML -> web rename tool")
     parser.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8765, help="Bind port (default: 8765)")
+    parser.add_argument("--no-browser", action="store_true", help="Do not auto-open web browser")
     args = parser.parse_args()
 
-    run_server(args.host, args.port)
+    run_server(args.host, args.port, auto_open_browser=not args.no_browser)
 
 
 if __name__ == "__main__":

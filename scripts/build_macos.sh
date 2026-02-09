@@ -18,7 +18,8 @@ pyinstaller --clean --noconfirm --onefile --name knx-web-tool knx_web_tool.py
 rm -rf package
 mkdir -p package
 cp dist/knx-web-tool package/
-cp README_web_tool.md package/README_web_tool.md
+cp README.md package/README.md
+cp README.en.md package/README.en.md
 
 rm -f knx-web-tool-macos.zip
 (

@@ -17,7 +17,8 @@ pyinstaller --clean --noconfirm --onefile --name knx-web-tool knx_web_tool.py
 if (Test-Path package) { Remove-Item package -Recurse -Force }
 New-Item -ItemType Directory -Path package | Out-Null
 Copy-Item dist\knx-web-tool.exe package\
-Copy-Item README_web_tool.md package\README_web_tool.md
+Copy-Item README.md package\README.md
+Copy-Item README.en.md package\README.en.md
 
 if (Test-Path knx-web-tool-windows.zip) { Remove-Item knx-web-tool-windows.zip -Force }
 Compress-Archive -Path package\* -DestinationPath knx-web-tool-windows.zip -Force
